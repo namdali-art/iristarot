@@ -228,6 +228,77 @@
                 }
             }, [history]);
 
+            // 데이터 내보내기 (JSON 형식)
+            const handleExport = () => {
+                if (history.length === 0) {
+                    alert("내보낼 데이터가 없습니다.");
+                    return;
+                }
+                const dataStr = JSON.stringify(history, null, 2);
+                const blob = new Blob([dataStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `tarot_history_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            // 데이터 불러오기
+            const handleImport = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (Array.isArray(importedData)) {
+                            // 중복 데이터 방지를 위해 id를 기준으로 필터링하여 병합
+                            const existingIds = new Set(history.map(item => item.id));
+                            const newHistory = [...history];
+                            let addedCount = 0;
+                            
+                            importedData.forEach(item => {
+                                if (!existingIds.has(item.id)) {
+                                    newHistory.push(item);
+                                    addedCount++;
+                                }
+                            });
+                            
+                            // 최신순으로 정렬
+                            newHistory.sort((a, b) => b.id - a.id);
+                            
+                            setHistory(newHistory);
+                            safeStorage.set("tarotHistory_kasi_korlunar", JSON.stringify(newHistory));
+                            
+                            if (addedCount > 0) {
+                                alert(`${addedCount}개의 새로운 기록을 성공적으로 불러왔습니다.`);
+                            } else {
+                                alert("모든 기록이 이미 보관함에 존재합니다.");
+                            }
+                        } else {
+                            alert("지원되지 않는 파일 형식입니다.");
+                        }
+                    } catch (error) {
+                        alert("파일을 읽는 중 오류가 발생했습니다.");
+                    }
+                };
+                reader.readAsText(file);
+                e.target.value = ''; // 동일 파일 재선택 가능하게 리셋
+            };
+
+            // 전체 일괄 삭제 기능
+            const handleClearAll = () => {
+                if (history.length === 0) return;
+                if (window.confirm("모든 기록을 영구적으로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")) {
+                    setHistory([]);
+                    safeStorage.set("tarotHistory_kasi_korlunar", "[]");
+                    setCurrentResult(null);
+                    alert("모든 기록이 삭제되었습니다.");
+                }
+            };
+
             const calculateTarotNumber = (y, m, d) => {
                 const sum = y + m + d;
                 const reduceNumber = (num) => {
@@ -237,6 +308,17 @@
                 let current = reduceNumber(sum);
                 while (current > 21 && current !== 22) {
                     current = reduceNumber(current);
+                }
+                return current === 22 ? 0 : current;
+            };
+
+            // 보너스 카드 계산 (양력 생년월일 각 자리수 모두 합산)
+            const calculateBonusCard = (y, m, d) => {
+                const dateStr = `${y}${m.toString().padStart(2, '0')}${d.toString().padStart(2, '0')}`;
+                let current = dateStr.split('').reduce((acc, curr) => acc + parseInt(curr, 10), 0);
+                
+                while (current >= 23) {
+                    current = current.toString().split('').reduce((acc, curr) => acc + parseInt(curr, 10), 0);
                 }
                 return current === 22 ? 0 : current;
             };
@@ -279,6 +361,10 @@
 
                         const innateCard = calculateTarotNumber(lunarDate.y, lunarDate.m, lunarDate.d);
                         const acquiredCard = calculateTarotNumber(solarDate.y, solarDate.m, solarDate.d);
+                        
+                        // 보너스 카드: 양력 생일의 모든 자릿수 합산
+                        const calculatedBonus = calculateBonusCard(solarDate.y, solarDate.m, solarDate.d);
+                        const bonusCard = calculatedBonus !== acquiredCard ? calculatedBonus : null;
 
                         const resultData = {
                             id: Date.now(),
@@ -289,6 +375,7 @@
                             lunar: lunarDate,
                             innateCard,
                             acquiredCard,
+                            bonusCard,
                             timestamp: new Date().toLocaleDateString()
                         };
 
@@ -329,17 +416,21 @@
                         </div>
                     )}
 
-                    <div className="w-full max-w-4xl flex flex-col gap-6 sm:gap-8 pb-16 mt-6 sm:mt-2">
+                    <div className="w-full max-w-6xl flex flex-col gap-6 sm:gap-8 pb-16 mt-6 sm:mt-2 mx-auto">
                         
                         {/* 헤더 */}
-                        <header className="text-center space-y-3 mt-4">
-                            <div className="inline-block px-4 py-1.5 rounded-full bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-1">
-                                이리스의 힐링타로 아카데미
+                        <header className="text-center space-y-4 mt-4">
+                            <div className="flex justify-center items-center w-full mb-2">
+                                <img 
+                                    src="https://healingtarot.co.kr/images/main/footlogo-new.png" 
+                                    alt="이리스의 힐링타로 아카데미" 
+                                    className="h-auto w-48 sm:w-64 md:w-80 object-contain drop-shadow-xl"
+                                />
                             </div>
                             <h1 className="text-3xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-indigo-300 tracking-tight pb-1">
                                 운명의 타로 생일수
                             </h1>
-                            <p className="text-slate-300 text-xs sm:text-sm md:text-base max-w-lg mx-auto break-keep leading-relaxed font-light">
+                            <p className="text-slate-300 text-xs sm:text-sm md:text-base max-w-lg mx-auto break-keep leading-relaxed font-light px-4">
                               도서 [이리스샘이 알려주는 타로카드의 공감 시크릿] 내용을 바탕으로 선천수와 후천수를 분석합니다.
                             </p>
                         </header>
@@ -436,7 +527,7 @@
                                     </div>
 
                                     {currentResult && (
-                                        <div id="result-area" className="space-y-6 animate-fade-in w-full max-w-4xl mx-auto pt-4 pb-12">
+                                        <div id="result-area" className="space-y-6 animate-fade-in w-full max-w-5xl mx-auto pt-4 pb-12">
                                             <div className="text-center bg-purple-950/40 rounded-2xl p-5 border border-purple-500/30 backdrop-blur-md shadow-xl">
                                                 <h2 className="text-xl sm:text-2xl text-purple-200 font-bold break-keep">
                                                     ✨ <span className="text-pink-300 underline underline-offset-4">{currentResult.name}</span> 님의 운명 레포트
@@ -446,9 +537,9 @@
                                                 </p>
                                             </div>
                                             
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                                            <div className={`grid grid-cols-1 md:grid-cols-2 ${currentResult.bonusCard != null ? 'lg:grid-cols-3' : ''} gap-6 w-full`}>
                                                 <ResultCard 
-                                                    title="선천수 (음력 기준: 내면의 자아)"
+                                                    title="선천수 (음력: 내면의 자아)"
                                                     dateLabel="변환된 음력"
                                                     dateObj={currentResult.lunar}
                                                     cardNum={currentResult.innateCard}
@@ -456,13 +547,23 @@
                                                     isOnline={isOnline}
                                                 />
                                                 <ResultCard 
-                                                    title="후천수 (양력 기준: 사회적 성향)"
+                                                    title="후천수 (양력: 사회적 성향)"
                                                     dateLabel="변환된 양력"
                                                     dateObj={currentResult.solar}
                                                     cardNum={currentResult.acquiredCard}
                                                     badgeBg="bg-pink-600"
                                                     isOnline={isOnline}
                                                 />
+                                                {currentResult.bonusCard != null && (
+                                                    <ResultCard 
+                                                        title="보너스 (숨겨진 잠재력)"
+                                                        dateLabel="양력 기준"
+                                                        dateObj={currentResult.solar}
+                                                        cardNum={currentResult.bonusCard}
+                                                        badgeBg="bg-amber-600"
+                                                        isOnline={isOnline}
+                                                    />
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -470,10 +571,38 @@
                             )}
 
                             {activeTab === 'history' && (
-                                <div className="glass-panel rounded-3xl p-6 sm:p-8 w-full max-w-2xl animate-fade-in">
-                                    <h2 className="text-xl sm:text-2xl font-bold text-purple-200 mb-6 flex items-center gap-2 pb-4 border-b border-purple-500/20">
-                                        📜 저장된 운명의 기록
-                                    </h2>
+                                <div className="glass-panel rounded-3xl p-4 sm:p-8 w-full max-w-4xl animate-fade-in mx-auto">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-6 border-b border-purple-500/20">
+                                        <h2 className="text-xl sm:text-2xl font-bold text-purple-200 flex items-center gap-2">
+                                            📜 저장된 운명의 기록
+                                        </h2>
+                                        
+                                        <div className="flex flex-wrap sm:flex-nowrap gap-2">
+                                            {/* 숨겨진 파일 인풋 */}
+                                            <input type="file" accept=".json" id="import-file" className="hidden" onChange={handleImport} />
+                                            
+                                            <button 
+                                                onClick={() => document.getElementById('import-file').click()} 
+                                                className="flex-1 sm:flex-none text-xs sm:text-sm py-2 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 border border-slate-600 transition-colors flex items-center justify-center gap-1.5 shadow-md"
+                                                title="저장된 JSON 데이터를 불러옵니다"
+                                            >
+                                                <span>📂 불러오기</span>
+                                            </button>
+                                            <button 
+                                                onClick={handleExport} 
+                                                className="flex-1 sm:flex-none text-xs sm:text-sm py-2 px-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 border border-slate-600 transition-colors flex items-center justify-center gap-1.5 shadow-md"
+                                                title="현재 기록을 JSON 파일로 다운로드합니다"
+                                            >
+                                                <span>💾 내보내기</span>
+                                            </button>
+                                            <button 
+                                                onClick={handleClearAll} 
+                                                className="flex-1 sm:flex-none text-xs sm:text-sm py-2 px-3 bg-red-900/40 hover:bg-red-800/60 rounded-xl text-red-300 border border-red-800/50 transition-colors flex items-center justify-center gap-1.5 shadow-md"
+                                            >
+                                                <span>🗑️ 일괄삭제</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                     
                                     {history.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
@@ -492,21 +621,30 @@
                                                                 {record.inputDate} ({record.inputType === 'solar' ? '양력' : '음력'})
                                                             </span>
                                                         </div>
-                                                        <div className="grid grid-cols-2 gap-3 text-sm">
-                                                            <div className="bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/10 overflow-hidden">
-                                                                <span className="text-[11px] font-bold text-indigo-300 block mb-1">선천수 카드</span>
+                                                        <div className={`grid ${record.bonusCard != null ? 'grid-cols-3' : 'grid-cols-2'} gap-2 sm:gap-3 text-sm`}>
+                                                            <div className="bg-purple-950/40 p-2 sm:p-2.5 rounded-xl border border-purple-500/10 overflow-hidden">
+                                                                <span className="text-[10px] sm:text-[11px] font-bold text-indigo-300 block mb-1">선천수</span>
                                                                 <span className="text-slate-200 font-medium flex items-center truncate">
                                                                     <TarotThumbnail cardNum={record.innateCard} isOnline={isOnline} />
                                                                     <span className="truncate">{record.innateCard}. {TAROT_CARDS[record.innateCard]?.name.split('(')[0]}</span>
                                                                 </span>
                                                             </div>
-                                                            <div className="bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/10 overflow-hidden">
-                                                                <span className="text-[11px] font-bold text-pink-300 block mb-1">후천수 카드</span>
+                                                            <div className="bg-purple-950/40 p-2 sm:p-2.5 rounded-xl border border-purple-500/10 overflow-hidden">
+                                                                <span className="text-[10px] sm:text-[11px] font-bold text-pink-300 block mb-1">후천수</span>
                                                                 <span className="text-slate-200 font-medium flex items-center truncate">
                                                                     <TarotThumbnail cardNum={record.acquiredCard} isOnline={isOnline} />
                                                                     <span className="truncate">{record.acquiredCard}. {TAROT_CARDS[record.acquiredCard]?.name.split('(')[0]}</span>
                                                                 </span>
                                                             </div>
+                                                            {record.bonusCard != null && (
+                                                                <div className="bg-purple-950/40 p-2 sm:p-2.5 rounded-xl border border-purple-500/10 overflow-hidden">
+                                                                    <span className="text-[10px] sm:text-[11px] font-bold text-amber-300 block mb-1">보너스</span>
+                                                                    <span className="text-slate-200 font-medium flex items-center truncate">
+                                                                        <TarotThumbnail cardNum={record.bonusCard} isOnline={isOnline} />
+                                                                        <span className="truncate">{record.bonusCard}. {TAROT_CARDS[record.bonusCard]?.name.split('(')[0]}</span>
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
 
