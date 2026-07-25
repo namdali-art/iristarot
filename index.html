@@ -118,14 +118,99 @@
             }
         };
 
+        const formatDate = (obj) => `${obj.y}년 ${obj.m}월 ${obj.d}일${obj.isLeap ? ' (윤달)' : ''}`;
+
+        // 보관함 목록에 쓰이는 작은 썸네일 컴포넌트
+        const TarotThumbnail = ({ cardNum, isOnline }) => {
+            const [error, setError] = useState(false);
+            const card = TAROT_CARDS[cardNum];
+            
+            useEffect(() => { setError(false); }, [isOnline, cardNum]);
+
+            if (!card) return null;
+
+            // 온라인이고 로딩 에러가 없을 때만 이미지 렌더링
+            if (isOnline && !error) {
+                return (
+                    <img 
+                        src={`https://gfx.tarot.com/images/site/decks/rider/full_size/${cardNum}.jpg`}
+                        alt={card.name}
+                        onError={() => setError(true)}
+                        className="w-6 h-9 object-cover rounded shadow-sm mr-2 border border-purple-500/30 flex-shrink-0"
+                    />
+                );
+            }
+            // 오프라인이거나 이미지 에러 시 이모지 폴백 렌더링
+            return <span className="mr-2 text-lg flex-shrink-0">{card.icon}</span>;
+        };
+
+        // 결과 화면에 쓰이는 큰 카드 컴포넌트
+        const ResultCard = ({ title, dateLabel, dateObj, cardNum, badgeBg, isOnline }) => {
+            const card = TAROT_CARDS[cardNum] || TAROT_CARDS[0];
+            const [imgError, setImgError] = useState(false);
+            const imageUrl = `https://gfx.tarot.com/images/site/decks/rider/full_size/${cardNum}.jpg`;
+
+            // 네트워크 상태나 카드가 바뀔 때 에러 상태 초기화
+            useEffect(() => {
+                setImgError(false);
+            }, [cardNum, isOnline]);
+
+            return (
+                <div className="tarot-card rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center relative overflow-hidden h-full">
+                    <div className={`absolute top-0 left-0 w-full text-xs font-bold py-2 ${badgeBg} text-white tracking-wider shadow-lg uppercase`}>
+                        {title}
+                    </div>
+                    <div className="mt-8 text-xs sm:text-sm text-purple-300 font-medium mb-1">{dateLabel} 기준</div>
+                    <div className="text-base sm:text-lg font-bold mb-6 text-slate-100">{formatDate(dateObj)}</div>
+                    
+                    {isOnline && !imgError ? (
+                        <img 
+                            src={imageUrl} 
+                            alt={card.name} 
+                            onError={() => setImgError(true)}
+                            className="h-48 sm:h-56 mb-6 floating rounded-xl shadow-[0_15px_30px_-5px_rgba(168,85,247,0.5)] border border-purple-400/40 object-contain"
+                        />
+                    ) : (
+                        <div className="text-7xl sm:text-8xl mb-6 floating filter drop-shadow-[0_10px_15px_rgba(168,85,247,0.4)]">
+                            {card.icon}
+                        </div>
+                    )}
+                    
+                    <div className="text-2xl sm:text-3xl font-bold tarot-title text-pink-200 mb-3 drop-shadow">
+                        {cardNum}. {card.name.split('(')[0]}
+                    </div>
+                    <div className="text-xs sm:text-sm text-purple-300/80 mb-4 font-sans">
+                        ({card.name.split('(')[1]}
+                    </div>
+                    <p className="text-sm sm:text-base text-slate-200 italic leading-relaxed break-keep px-4 py-3.5 bg-slate-900/60 rounded-2xl w-full border border-purple-500/20 shadow-inner">
+                        "{card.keyword}"
+                    </p>
+                </div>
+            );
+        };
+
         const App = () => {
             const [name, setName] = useState("");
             const [birthDate, setBirthDate] = useState("");
-            const [inputType, setInputType] = useState("solar"); // 'solar' 또는 'lunar'
+            const [inputType, setInputType] = useState("solar"); 
             const [activeTab, setActiveTab] = useState("calc"); 
             const [currentResult, setCurrentResult] = useState(null);
             const [history, setHistory] = useState([]);
             const [loading, setLoading] = useState(false);
+            
+            // 실시간 온라인/오프라인 상태 관리
+            const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+            // 네트워크 상태 변화 감지
+            useEffect(() => {
+                const handleStatusChange = () => setIsOnline(navigator.onLine);
+                window.addEventListener('online', handleStatusChange);
+                window.addEventListener('offline', handleStatusChange);
+                return () => {
+                    window.removeEventListener('online', handleStatusChange);
+                    window.removeEventListener('offline', handleStatusChange);
+                };
+            }, []);
 
             useEffect(() => {
                 const savedHistory = safeStorage.get("tarotHistory_kasi_korlunar");
@@ -143,7 +228,6 @@
                 }
             }, [history]);
 
-            // 타로 생일수 수치 계산 함수 (연 + 월 + 일 각 자리수 합산 축약)
             const calculateTarotNumber = (y, m, d) => {
                 const sum = y + m + d;
                 const reduceNumber = (num) => {
@@ -184,18 +268,15 @@
                         let lunarDate = {};
 
                         if (inputType === 'solar') {
-                            // 양력 -> 음력 변환 (kor-lunar 라이브러리 사용)
                             const lRes = window.korLunar.toLunar(year, month, day);
                             solarDate = { y: year, m: month, d: day };
                             lunarDate = { y: lRes.year, m: lRes.month, d: lRes.day, isLeap: lRes.isLeapMonth };
                         } else {
-                            // 음력 -> 양력 변환 (기본 평달 기준)
                             const sRes = window.korLunar.toSolar(year, month, day, false);
                             lunarDate = { y: year, m: month, d: day, isLeap: false };
                             solarDate = { y: sRes.year, m: sRes.month, d: sRes.day };
                         }
 
-                        // 선천수: 음력 생일 기준, 후천수: 양력 생일 기준
                         const innateCard = calculateTarotNumber(lunarDate.y, lunarDate.m, lunarDate.d);
                         const acquiredCard = calculateTarotNumber(solarDate.y, solarDate.m, solarDate.d);
 
@@ -238,45 +319,24 @@
                 }
             };
 
-            const formatDate = (obj) => `${obj.y}년 ${obj.m}월 ${obj.d}일${obj.isLeap ? ' (윤달)' : ''}`;
-
-            const ResultCard = ({ title, dateLabel, dateObj, cardNum, badgeBg }) => {
-                const card = TAROT_CARDS[cardNum] || TAROT_CARDS[0];
-                
-                return (
-                    <div className="tarot-card rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center relative overflow-hidden h-full">
-                        <div className={`absolute top-0 left-0 w-full text-xs font-bold py-2 ${badgeBg} text-white tracking-wider shadow-lg uppercase`}>
-                            {title}
-                        </div>
-                        <div className="mt-8 text-xs sm:text-sm text-purple-300 font-medium mb-1">{dateLabel} 기준</div>
-                        <div className="text-base sm:text-lg font-bold mb-6 text-slate-100">{formatDate(dateObj)}</div>
-                        
-                        <div className="text-7xl sm:text-8xl mb-6 floating filter drop-shadow-[0_10px_15px_rgba(168,85,247,0.4)]">
-                            {card.icon}
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-bold tarot-title text-pink-200 mb-3 drop-shadow">
-                            {cardNum}. {card.name.split('(')[0]}
-                        </div>
-                        <div className="text-xs sm:text-sm text-purple-300/80 mb-4 font-sans">
-                            ({card.name.split('(')[1]}
-                        </div>
-                        <p className="text-sm sm:text-base text-slate-200 italic leading-relaxed break-keep px-4 py-3.5 bg-slate-900/60 rounded-2xl w-full border border-purple-500/20 shadow-inner">
-                            "{card.keyword}"
-                        </p>
-                    </div>
-                );
-            };
-
             return (
-                <div className="min-h-[100dvh] p-4 sm:p-6 lg:p-8 flex justify-center items-start">
-                    <div className="w-full max-w-4xl flex flex-col gap-6 sm:gap-8 pb-16">
+                <div className="min-h-[100dvh] p-4 sm:p-6 lg:p-8 flex justify-center items-start relative">
+                    {/* 오프라인 상태 표시 인디케이터 */}
+                    {!isOnline && (
+                        <div className="fixed top-4 right-4 bg-red-500/90 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-md border border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)] z-50 flex items-center gap-1.5 animate-fade-in font-semibold tracking-wide">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"></path></svg>
+                            오프라인 (이모지 대체)
+                        </div>
+                    )}
+
+                    <div className="w-full max-w-4xl flex flex-col gap-6 sm:gap-8 pb-16 mt-6 sm:mt-2">
                         
                         {/* 헤더 */}
                         <header className="text-center space-y-3 mt-4">
                             <div className="inline-block px-4 py-1.5 rounded-full bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-1">
                                 이리스의 힐링타로 아카데미
                             </div>
-                            <h1 className="text-3xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-indigo-300 tracking-tight">
+                            <h1 className="text-3xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-indigo-300 tracking-tight pb-1">
                                 운명의 타로 생일수
                             </h1>
                             <p className="text-slate-300 text-xs sm:text-sm md:text-base max-w-lg mx-auto break-keep leading-relaxed font-light">
@@ -300,7 +360,7 @@
                             </button>
                         </div>
 
-                        {/* 메인 폼 */}
+                        {/* 메인 폼 및 결과 */}
                         <main className="w-full flex flex-col items-center">
                             {activeTab === 'calc' && (
                                 <div className="w-full max-w-xl animate-fade-in space-y-8">
@@ -393,6 +453,7 @@
                                                     dateObj={currentResult.lunar}
                                                     cardNum={currentResult.innateCard}
                                                     badgeBg="bg-indigo-600"
+                                                    isOnline={isOnline}
                                                 />
                                                 <ResultCard 
                                                     title="후천수 (양력 기준: 사회적 성향)"
@@ -400,6 +461,7 @@
                                                     dateObj={currentResult.solar}
                                                     cardNum={currentResult.acquiredCard}
                                                     badgeBg="bg-pink-600"
+                                                    isOnline={isOnline}
                                                 />
                                             </div>
                                         </div>
@@ -423,24 +485,26 @@
                                             {history.map((record) => (
                                                 <div key={record.id} className="bg-slate-900/80 border border-purple-500/20 rounded-2xl p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between transition-all hover:border-pink-500/40 group shadow-lg">
                                                     
-                                                    <div className="flex-1 w-full">
+                                                    <div className="flex-1 w-full overflow-hidden">
                                                         <div className="flex items-center justify-between sm:justify-start gap-3 mb-3">
-                                                            <h3 className="text-lg font-bold text-white">{record.name}</h3>
-                                                            <span className="text-xs font-medium px-2.5 py-1 bg-purple-950 rounded-full text-purple-300 border border-purple-800/50">
+                                                            <h3 className="text-lg font-bold text-white truncate">{record.name}</h3>
+                                                            <span className="text-xs font-medium px-2.5 py-1 bg-purple-950 rounded-full text-purple-300 border border-purple-800/50 whitespace-nowrap">
                                                                 {record.inputDate} ({record.inputType === 'solar' ? '양력' : '음력'})
                                                             </span>
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-3 text-sm">
-                                                            <div className="bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/10">
+                                                            <div className="bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/10 overflow-hidden">
                                                                 <span className="text-[11px] font-bold text-indigo-300 block mb-1">선천수 카드</span>
-                                                                <span className="text-slate-200 font-medium truncate block">
-                                                                    {TAROT_CARDS[record.innateCard]?.icon} {record.innateCard}. {TAROT_CARDS[record.innateCard]?.name.spec ? '' : TAROT_CARDS[record.innateCard]?.name.split('(')[0]}
+                                                                <span className="text-slate-200 font-medium flex items-center truncate">
+                                                                    <TarotThumbnail cardNum={record.innateCard} isOnline={isOnline} />
+                                                                    <span className="truncate">{record.innateCard}. {TAROT_CARDS[record.innateCard]?.name.split('(')[0]}</span>
                                                                 </span>
                                                             </div>
-                                                            <div className="bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/10">
+                                                            <div className="bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/10 overflow-hidden">
                                                                 <span className="text-[11px] font-bold text-pink-300 block mb-1">후천수 카드</span>
-                                                                <span className="text-slate-200 font-medium truncate block">
-                                                                    {TAROT_CARDS[record.acquiredCard]?.icon} {record.acquiredCard}. {TAROT_CARDS[record.acquiredCard]?.name.split('(')[0]}
+                                                                <span className="text-slate-200 font-medium flex items-center truncate">
+                                                                    <TarotThumbnail cardNum={record.acquiredCard} isOnline={isOnline} />
+                                                                    <span className="truncate">{record.acquiredCard}. {TAROT_CARDS[record.acquiredCard]?.name.split('(')[0]}</span>
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -453,13 +517,13 @@
                                                                 setActiveTab('calc');
                                                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                                                             }}
-                                                            className="flex-1 sm:flex-none py-2 px-4 bg-purple-600/30 text-purple-200 rounded-xl hover:bg-purple-600/50 transition-colors text-sm font-medium border border-purple-500/30"
+                                                            className="flex-1 sm:flex-none py-2 px-4 bg-purple-600/30 text-purple-200 rounded-xl hover:bg-purple-600/50 transition-colors text-sm font-medium border border-purple-500/30 whitespace-nowrap"
                                                         >
                                                             다시보기
                                                         </button>
                                                         <button 
                                                             onClick={() => handleDelete(record.id)}
-                                                            className="py-2 px-3 bg-red-500/20 text-red-300 rounded-xl hover:bg-red-500/40 transition-colors text-sm border border-red-500/30"
+                                                            className="py-2 px-3 bg-red-500/20 text-red-300 rounded-xl hover:bg-red-500/40 transition-colors text-sm border border-red-500/30 whitespace-nowrap"
                                                         >
                                                             삭제
                                                         </button>
