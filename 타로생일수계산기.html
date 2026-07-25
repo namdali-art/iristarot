@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>운명의 타로 생일수 계산기_이리스의 힐링타로 아카데미</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 한국천문연구원(KASI) 데이터 기반 음양력 변환 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/kor-lunar@1.7/dist/kor-lunar.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Nanum+Myeongjo:wght@400;700&display=swap');
+        
+        :root { color-scheme: dark; }
+
+        body {
+            font-family: 'Gowun Dodum', sans-serif;
+            background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #0f172a 70%, #020617 100%);
+            color: #f8fafc;
+            min-height: 100dvh; 
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, .tarot-title {
+            font-family: 'Nanum Myeongjo', serif;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+        }
+
+        .tarot-card {
+            background: linear-gradient(135deg, rgba(88, 28, 135, 0.8) 0%, rgba(30, 27, 75, 0.9) 50%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            box-shadow: 0 15px 35px -10px rgba(168, 85, 247, 0.3);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .tarot-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 25px 50px -12px rgba(168, 85, 247, 0.5);
+            border-color: rgba(236, 72, 153, 0.6);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        .floating {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // 메이저 타로 카드 데이터 (0~21)
+        const TAROT_CARDS = {
+            0: { name: "바보 (The Fool)", icon: "🃏", keyword: "새로운 시작, 자유로운 영혼, 순수한 열정, 무한한 잠재력" },
+            1: { name: "마법사 (The Magician)", icon: "🪄", keyword: "창조력, 뛰어난 재능, 자신감, 시작과 실행력" },
+            2: { name: "고위 여사제 (The High Priestess)", icon: "📖", keyword: "깊은 직관, 신비로움, 지혜, 내면의 통찰력" },
+            3: { name: "여황제 (The Empress)", icon: "👑", keyword: "풍요로움, 모성애, 사랑, 아름다움과 조화" },
+            4: { name: "황제 (The Emperor)", icon: "🛡️", keyword: "강인한 리더십, 권위, 책임감, 안정과 질서" },
+            5: { name: "교황 (The Hierophant)", icon: "⛪", keyword: "전통, 정신적 지도, 믿음, 교육과 조언" },
+            6: { name: "연인 (The Lovers)", icon: "💘", keyword: "진정한 사랑, 중요한 선택, 조화로운 파트너십" },
+            7: { name: "전차 (The Chariot)", icon: "🛞", keyword: "불굴의 의지력, 전진, 성공을 향한 돌파구" },
+            8: { name: "힘 (Strength)", icon: "🦁", keyword: "부드러운 카리스마, 용기, 인내와 내면의 강인함" },
+            9: { name: "은둔자 (The Hermit)", icon: "🏮", keyword: "깊은 지혜, 내면 탐색, 신중함과 정신적 성찰" },
+            10: { name: "운명의 수레바퀴 (Wheel of Fortune)", icon: "🎡", keyword: "피할 수 없는 변화, 새로운 전환점, 행운" },
+            11: { name: "정의 (Justice)", icon: "⚖️", keyword: "공정함, 균형 잡힌 시각, 명확한 결단과 인과응보" },
+            12: { name: "매달린 사람 (The Hanged Man)", icon: "🙃", keyword: "희생과 인내, 새로운 시각, 잠시 멈춤과 깨달음" },
+            13: { name: "죽음 (Death)", icon: "💀", keyword: "완전한 끝과 새로운 시작, 환골탈태, 변화" },
+            14: { name: "절제 (Temperance)", icon: "👼", keyword: "조화와 균형, 인내, 상생과 융합의 미덕" },
+            15: { name: "악마 (The Devil)", icon: "👿", keyword: "거부하기 힘든 유혹, 깊은 집착, 물질적 욕망" },
+            16: { name: "탑 (The Tower)", icon: "⚡", keyword: "갑작스러운 변화와 충격, 낡은 체원의 붕괴와 해방" },
+            17: { name: "별 (The Star)", icon: "⭐", keyword: "빛나는 희망, 영감, 치유와 평화의 기운" },
+            18: { name: "달 (The Moon)", icon: "🌙", keyword: "막연한 불안감, 상상력, 감추어진 진실과 직관" },
+            19: { name: "태양 (The Sun)", icon: "☀️", keyword: "눈부신 성공, 긍정적인 에너지, 활력과 행복" },
+            20: { name: "심판 (Judgement)", icon: "🎺", keyword: "부활과 각성, 정당한 평가, 새로운 소명" },
+            21: { name: "세계 (The World)", icon: "🌍", keyword: "완성과 통합, 성공적인 결실, 새로운 차원으로의 도약" }
+        };
+
+        const safeStorage = {
+            get: (key) => {
+                try { return localStorage.getItem(key); } catch(e) { return null; }
+            },
+            set: (key, value) => {
+                try { localStorage.setItem(key, value); } catch(e) {}
+            }
+        };
+
+        const App = () => {
+            const [name, setName] = useState("");
+            const [birthDate, setBirthDate] = useState("");
+            const [inputType, setInputType] = useState("solar"); // 'solar' 또는 'lunar'
+            const [activeTab, setActiveTab] = useState("calc"); 
+            const [currentResult, setCurrentResult] = useState(null);
+            const [history, setHistory] = useState([]);
+            const [loading, setLoading] = useState(false);
+
+            useEffect(() => {
+                const savedHistory = safeStorage.get("tarotHistory_kasi_korlunar");
+                if (savedHistory) {
+                    try {
+                        const parsed = JSON.parse(savedHistory);
+                        if (Array.isArray(parsed)) setHistory(parsed);
+                    } catch (e) {}
+                }
+            }, []);
+
+            useEffect(() => {
+                if (history.length > 0) {
+                    safeStorage.set("tarotHistory_kasi_korlunar", JSON.stringify(history));
+                }
+            }, [history]);
+
+            // 타로 생일수 수치 계산 함수 (연 + 월 + 일 각 자리수 합산 축약)
+            const calculateTarotNumber = (y, m, d) => {
+                const sum = y + m + d;
+                const reduceNumber = (num) => {
+                    return num.toString().split('').reduce((acc, curr) => acc + parseInt(curr, 10), 0);
+                };
+
+                let current = reduceNumber(sum);
+                while (current > 21 && current !== 22) {
+                    current = reduceNumber(current);
+                }
+                return current === 22 ? 0 : current;
+            };
+
+            const handleCalculate = (e) => {
+                e.preventDefault();
+                
+                if (!name.trim()) {
+                    alert("이름을 입력해주세요.");
+                    return;
+                }
+                if (!birthDate) {
+                    alert("생년월일을 선택해주세요.");
+                    return;
+                }
+
+                if (!window.korLunar) {
+                    alert("천문연구원 음양력 변환 모듈이 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+                    return;
+                }
+
+                setLoading(true);
+
+                setTimeout(() => {
+                    try {
+                        const [year, month, day] = birthDate.split('-').map(Number);
+                        
+                        let solarDate = {};
+                        let lunarDate = {};
+
+                        if (inputType === 'solar') {
+                            // 양력 -> 음력 변환 (kor-lunar 라이브러리 사용)
+                            const lRes = window.korLunar.toLunar(year, month, day);
+                            solarDate = { y: year, m: month, d: day };
+                            lunarDate = { y: lRes.year, m: lRes.month, d: lRes.day, isLeap: lRes.isLeapMonth };
+                        } else {
+                            // 음력 -> 양력 변환 (기본 평달 기준)
+                            const sRes = window.korLunar.toSolar(year, month, day, false);
+                            lunarDate = { y: year, m: month, d: day, isLeap: false };
+                            solarDate = { y: sRes.year, m: sRes.month, d: sRes.day };
+                        }
+
+                        // 선천수: 음력 생일 기준, 후천수: 양력 생일 기준
+                        const innateCard = calculateTarotNumber(lunarDate.y, lunarDate.m, lunarDate.d);
+                        const acquiredCard = calculateTarotNumber(solarDate.y, solarDate.m, solarDate.d);
+
+                        const resultData = {
+                            id: Date.now(),
+                            name: name.trim(),
+                            inputDate: birthDate,
+                            inputType: inputType,
+                            solar: solarDate,
+                            lunar: lunarDate,
+                            innateCard,
+                            acquiredCard,
+                            timestamp: new Date().toLocaleDateString()
+                        };
+
+                        setCurrentResult(resultData);
+                        setHistory(prev => [resultData, ...prev.filter(item => item.name !== resultData.name || item.inputDate !== resultData.inputDate)]);
+                        setLoading(false);
+
+                        setTimeout(() => {
+                            const resultArea = document.getElementById('result-area');
+                            if (resultArea) resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 100);
+
+                    } catch (error) {
+                        setLoading(false);
+                        alert("변환 지원 범위를 벗어났거나 유효하지 않은 날짜입니다. (지원 범위: 1890~2050년)");
+                    }
+                }, 300);
+            };
+
+            const handleDelete = (id) => {
+                if(window.confirm("이 기록을 삭제하시겠습니까?")) {
+                    const updated = history.filter(item => item.id !== id);
+                    setHistory(updated);
+                    safeStorage.set("tarotHistory_kasi_korlunar", JSON.stringify(updated));
+                    if(currentResult && currentResult.id === id) {
+                        setCurrentResult(null);
+                    }
+                }
+            };
+
+            const formatDate = (obj) => `${obj.y}년 ${obj.m}월 ${obj.d}일${obj.isLeap ? ' (윤달)' : ''}`;
+
+            const ResultCard = ({ title, dateLabel, dateObj, cardNum, badgeBg }) => {
+                const card = TAROT_CARDS[cardNum] || TAROT_CARDS[0];
+                
+                return (
+                    <div className="tarot-card rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center relative overflow-hidden h-full">
+                        <div className={`absolute top-0 left-0 w-full text-xs font-bold py-2 ${badgeBg} text-white tracking-wider shadow-lg uppercase`}>
+                            {title}
+                        </div>
+                        <div className="mt-8 text-xs sm:text-sm text-purple-300 font-medium mb-1">{dateLabel} 기준</div>
+                        <div className="text-base sm:text-lg font-bold mb-6 text-slate-100">{formatDate(dateObj)}</div>
+                        
+                        <div className="text-7xl sm:text-8xl mb-6 floating filter drop-shadow-[0_10px_15px_rgba(168,85,247,0.4)]">
+                            {card.icon}
+                        </div>
+                        <div className="text-2xl sm:text-3xl font-bold tarot-title text-pink-200 mb-3 drop-shadow">
+                            {cardNum}. {card.name.split('(')[0]}
+                        </div>
+                        <div className="text-xs sm:text-sm text-purple-300/80 mb-4 font-sans">
+                            ({card.name.split('(')[1]}
+                        </div>
+                        <p className="text-sm sm:text-base text-slate-200 italic leading-relaxed break-keep px-4 py-3.5 bg-slate-900/60 rounded-2xl w-full border border-purple-500/20 shadow-inner">
+                            "{card.keyword}"
+                        </p>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="min-h-[100dvh] p-4 sm:p-6 lg:p-8 flex justify-center items-start">
+                    <div className="w-full max-w-4xl flex flex-col gap-6 sm:gap-8 pb-16">
+                        
+                        {/* 헤더 */}
+                        <header className="text-center space-y-3 mt-4">
+                            <div className="inline-block px-4 py-1.5 rounded-full bg-purple-900/40 border border-purple-500/30 text-purple-300 text-xs sm:text-sm font-semibold tracking-widest uppercase mb-1">
+                                이리스의 힐링타로 아카데미
+                            </div>
+                            <h1 className="text-3xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-indigo-300 tracking-tight">
+                                운명의 타로 생일수
+                            </h1>
+                            <p className="text-slate-300 text-xs sm:text-sm md:text-base max-w-lg mx-auto break-keep leading-relaxed font-light">
+                              도서 [이리스샘이 알려주는 타로카드의 공감 시크릿] 내용을 바탕으로 선천수와 후천수를 분석합니다.
+                            </p>
+                        </header>
+
+                        {/* 탭 버튼 */}
+                        <div className="flex justify-center gap-3 w-full max-w-sm mx-auto">
+                            <button 
+                                onClick={() => setActiveTab("calc")}
+                                className={`flex-1 py-3 px-4 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm sm:text-base font-semibold shadow-lg ${activeTab === 'calc' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-purple-900/50 scale-105' : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700/80 border border-slate-700/50'}`}
+                            >
+                                🌟 생일수 계산
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab("history")}
+                                className={`flex-1 py-3 px-4 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm sm:text-base font-semibold shadow-lg ${activeTab === 'history' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-purple-900/50 scale-105' : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700/80 border border-slate-700/50'}`}
+                            >
+                                📜 보관함 {history.length > 0 && <span className="bg-pink-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">{history.length}</span>}
+                            </button>
+                        </div>
+
+                        {/* 메인 폼 */}
+                        <main className="w-full flex flex-col items-center">
+                            {activeTab === 'calc' && (
+                                <div className="w-full max-w-xl animate-fade-in space-y-8">
+                                    <div className="glass-panel rounded-3xl p-6 sm:p-10 w-full">
+                                        <form onSubmit={handleCalculate} className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-semibold text-purple-200 flex items-center gap-2 ml-1">
+                                                    ✨ 이름 (또는 닉네임)
+                                                </label>
+                                                <input 
+                                                    type="text" 
+                                                    value={name}
+                                                    onChange={(e) => setName(e.target.value)}
+                                                    className="w-full bg-slate-900/80 border border-purple-500/30 rounded-2xl px-5 py-4 text-white text-base focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all placeholder:text-slate-500 shadow-inner"
+                                                    placeholder="성함을 입력해주세요"
+                                                />
+                                            </div>
+                                            
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-semibold text-purple-200 flex items-center gap-2 ml-1">
+                                                    📅 생년월일 선택 (1890~2050년)
+                                                </label>
+                                                <input 
+                                                    type="date" 
+                                                    value={birthDate}
+                                                    onChange={(e) => setBirthDate(e.target.value)}
+                                                    min="1890-01-01"
+                                                    max="2050-12-31"
+                                                    className="w-full bg-slate-900/80 border border-purple-500/30 rounded-2xl px-5 py-4 text-white text-base focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all cursor-pointer shadow-inner"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-semibold text-purple-200 flex items-center gap-2 ml-1">
+                                                    🔄 입력한 생년월일의 역법 종류
+                                                </label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setInputType('solar')}
+                                                        className={`py-3 px-4 rounded-xl text-sm font-semibold transition-all border ${inputType === 'solar' ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' : 'bg-slate-900/50 border-purple-500/20 text-slate-400 hover:text-white'}`}
+                                                    >
+                                                        ☀️ 양력 (Solar)
+                                                    </button>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setInputType('lunar')}
+                                                        className={`py-3 px-4 rounded-xl text-sm font-semibold transition-all border ${inputType === 'lunar' ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg' : 'bg-slate-900/50 border-purple-500/20 text-slate-400 hover:text-white'}`}
+                                                    >
+                                                        🌙 음력 (Lunar)
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <button 
+                                                type="submit"
+                                                disabled={loading}
+                                                className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold py-4 px-6 rounded-2xl shadow-xl shadow-purple-900/50 transform transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4 text-base sm:text-lg tracking-wide disabled:opacity-50"
+                                            >
+                                                {loading ? (
+                                                    <span className="flex items-center gap-2">
+                                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                        </svg>
+                                                        정밀 천문 역법 변환 중...
+                                                    </span>
+                                                ) : (
+                                                    <>🔮 운명의 타로카드 뽑기</>
+                                                )}
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    {currentResult && (
+                                        <div id="result-area" className="space-y-6 animate-fade-in w-full max-w-4xl mx-auto pt-4 pb-12">
+                                            <div className="text-center bg-purple-950/40 rounded-2xl p-5 border border-purple-500/30 backdrop-blur-md shadow-xl">
+                                                <h2 className="text-xl sm:text-2xl text-purple-200 font-bold break-keep">
+                                                    ✨ <span className="text-pink-300 underline underline-offset-4">{currentResult.name}</span> 님의 운명 레포트
+                                                </h2>
+                                                <p className="text-xs text-purple-300/70 mt-1">
+                                                    입력 기준: {currentResult.inputType === 'solar' ? '양력' : '음력'} ({currentResult.inputDate})
+                                                </p>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                                                <ResultCard 
+                                                    title="선천수 (음력 기준: 내면의 자아)"
+                                                    dateLabel="변환된 음력"
+                                                    dateObj={currentResult.lunar}
+                                                    cardNum={currentResult.innateCard}
+                                                    badgeBg="bg-indigo-600"
+                                                />
+                                                <ResultCard 
+                                                    title="후천수 (양력 기준: 사회적 성향)"
+                                                    dateLabel="변환된 양력"
+                                                    dateObj={currentResult.solar}
+                                                    cardNum={currentResult.acquiredCard}
+                                                    badgeBg="bg-pink-600"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'history' && (
+                                <div className="glass-panel rounded-3xl p-6 sm:p-8 w-full max-w-2xl animate-fade-in">
+                                    <h2 className="text-xl sm:text-2xl font-bold text-purple-200 mb-6 flex items-center gap-2 pb-4 border-b border-purple-500/20">
+                                        📜 저장된 운명의 기록
+                                    </h2>
+                                    
+                                    {history.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+                                            <span className="text-4xl opacity-40">🌙</span>
+                                            <p className="text-sm sm:text-base">아직 저장된 기록이 없습니다.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-2 hide-scrollbar">
+                                            {history.map((record) => (
+                                                <div key={record.id} className="bg-slate-900/80 border border-purple-500/20 rounded-2xl p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between transition-all hover:border-pink-500/40 group shadow-lg">
+                                                    
+                                                    <div className="flex-1 w-full">
+                                                        <div className="flex items-center justify-between sm:justify-start gap-3 mb-3">
+                                                            <h3 className="text-lg font-bold text-white">{record.name}</h3>
+                                                            <span className="text-xs font-medium px-2.5 py-1 bg-purple-950 rounded-full text-purple-300 border border-purple-800/50">
+                                                                {record.inputDate} ({record.inputType === 'solar' ? '양력' : '음력'})
+                                                            </span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                                            <div className="bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/10">
+                                                                <span className="text-[11px] font-bold text-indigo-300 block mb-1">선천수 카드</span>
+                                                                <span className="text-slate-200 font-medium truncate block">
+                                                                    {TAROT_CARDS[record.innateCard]?.icon} {record.innateCard}. {TAROT_CARDS[record.innateCard]?.name.spec ? '' : TAROT_CARDS[record.innateCard]?.name.split('(')[0]}
+                                                                </span>
+                                                            </div>
+                                                            <div className="bg-purple-950/40 p-2.5 rounded-xl border border-purple-500/10">
+                                                                <span className="text-[11px] font-bold text-pink-300 block mb-1">후천수 카드</span>
+                                                                <span className="text-slate-200 font-medium truncate block">
+                                                                    {TAROT_CARDS[record.acquiredCard]?.icon} {record.acquiredCard}. {TAROT_CARDS[record.acquiredCard]?.name.split('(')[0]}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex gap-2 w-full sm:w-auto justify-end border-t border-purple-500/10 pt-3 sm:border-none sm:pt-0">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setCurrentResult(record);
+                                                                setActiveTab('calc');
+                                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                            }}
+                                                            className="flex-1 sm:flex-none py-2 px-4 bg-purple-600/30 text-purple-200 rounded-xl hover:bg-purple-600/50 transition-colors text-sm font-medium border border-purple-500/30"
+                                                        >
+                                                            다시보기
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDelete(record.id)}
+                                                            className="py-2 px-3 bg-red-500/20 text-red-300 rounded-xl hover:bg-red-500/40 transition-colors text-sm border border-red-500/30"
+                                                        >
+                                                            삭제
+                                                        </button>
+                                                    </div>
+
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </main>
+                        
+                        <footer className="text-center text-xs text-purple-400/60 mt-12 space-y-1 font-light">
+                            <p>한국천문연구원 양음력 변환 사용으로 정확도를 높였습니다.</p>
+                        </footer>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
