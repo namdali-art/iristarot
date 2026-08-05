@@ -1,19 +1,16 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <!-- favicon -->
-    <link rel="icon" type="image/png" href="https://namdali-art.github.io/iristarot/assets/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="https://namdali-art.github.io/iristarot/assets/favicon.svg" />
-    <link rel="shortcut icon" href="https://namdali-art.github.io/iristarot/assets/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="https://namdali-art.github.io/iristarot/assets/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/assets/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+    <link rel="shortcut icon" href="/assets/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="타로생일수" />
-    <link rel="manifest" href="https://namdali-art.github.io/iristarot/assets/site.webmanifest" />
+    <link rel="manifest" href="/assets/site.webmanifest" />
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>운명의 타로 생일수 계산기_이리스의 힐링타로 아카데미</title>
-    
-   
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -139,6 +136,32 @@
             21: { name: "세계 (The World)", icon: "🌍", keyword: "완성과 통합, 성공적인 결실, 새로운 차원으로의 도약" }
         };
 
+        // 🌟 첨부해주신 블로그 링크 업데이트 완료
+        const TAROT_LINKS = {
+            0: "https://blog.naver.com/tllove57/223023057522",
+            1: "https://blog.naver.com/tllove57/223023059993", 
+            2: "https://blog.naver.com/tllove57/223023061648", 
+            3: "https://blog.naver.com/tllove57/223023064075", 
+            4: "https://blog.naver.com/tllove57/223023065898", 
+            5: "https://blog.naver.com/tllove57/223023074157", 
+            6: "https://blog.naver.com/tllove57/223054346257", 
+            7: "https://blog.naver.com/tllove57/223054387123", 
+            8: "https://blog.naver.com/tllove57/223054916965", 
+            9: "https://blog.naver.com/tllove57/223054930481", 
+            10: "https://blog.naver.com/tllove57/223054930481",
+            11: "https://blog.naver.com/tllove57/223054951239",
+            12: "https://blog.naver.com/tllove57/223120967829",
+            13: "https://blog.naver.com/tllove57/223120992206",
+            14: "https://blog.naver.com/tllove57/223121009083",
+            15: "https://blog.naver.com/tllove57/223121104268",
+            16: "https://blog.naver.com/tllove57/223121125440",
+            17: "https://blog.naver.com/tllove57/223121138105",
+            18: "https://blog.naver.com/tllove57/223121154098",
+            19: "https://blog.naver.com/tllove57/223121166079",
+            20: "https://blog.naver.com/tllove57/223121178288",
+            21: "https://blog.naver.com/tllove57/223121189989"
+        };
+
         const safeStorage = {
             get: (key) => {
                 try { return localStorage.getItem(key); } catch(e) { return null; }
@@ -150,7 +173,6 @@
 
         const formatDate = (obj) => `${obj.y}년 ${obj.m}월 ${obj.d}일${obj.isLeap ? ' (윤달)' : ''}`;
 
-        // CSS 변수(동적 스타일용)와 Tailwind 유틸리티 클래스(UI 렌더링용)를 하나로 관리합니다.
         const THEME_CONFIG = {
             purple: {
                 cssVars: {
@@ -426,6 +448,30 @@
             }
         };
 
+        const CustomDialog = ({ isOpen, type, title, text, onConfirm, onCancel, tc }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in" onClick={type === 'alert' ? onConfirm : onCancel}>
+                    <div className={`glass-panel rounded-2xl p-6 sm:p-8 w-full max-w-sm flex flex-col gap-4 border ${tc.borderMain}`} onClick={e => e.stopPropagation()}>
+                        <h3 className={`text-lg font-bold flex items-center gap-2 ${tc.textMain}`}>
+                            {type === 'alert' ? '🔔' : '❓'} {title}
+                        </h3>
+                        <p className="text-slate-200 text-sm break-keep leading-relaxed whitespace-pre-wrap">{text}</p>
+                        <div className="flex gap-3 justify-end mt-4">
+                            {type === 'confirm' && (
+                                <button onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors border border-slate-600">
+                                    취소
+                                </button>
+                            )}
+                            <button onClick={onConfirm} className={`px-5 py-2 rounded-xl text-sm font-bold text-white transition-all shadow-lg bg-gradient-to-r ${tc.btnPrimary} hover:scale-105 active:scale-95`}>
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const TarotThumbnail = ({ cardNum, isOnline, tc }) => {
             const [error, setError] = useState(false);
             const card = TAROT_CARDS[cardNum];
@@ -447,8 +493,9 @@
             return <span className="mr-2 text-lg flex-shrink-0">{card.icon}</span>;
         };
 
-        const ResultCard = ({ title, dateLabel, dateObj, cardNum, badgeBg, isOnline, tc }) => {
+        const ResultCard = ({ title, dateLabel, dateObj, cardNum, badgeBg, isOnline, tc, showAlert }) => {
             const card = TAROT_CARDS[cardNum] || TAROT_CARDS[0];
+            const link = TAROT_LINKS[cardNum] || "";
             const [imgError, setImgError] = useState(false);
             const imageUrl = `https://namdali-art.github.io/iristarot/images/majorcards/${cardNum}.jpg`;
 
@@ -483,9 +530,25 @@
                     <div className={`text-xs sm:text-sm mb-4 font-sans transition-colors ${tc.textSubLight}`}>
                         ({card.name.split('(')[1]}
                     </div>
-                    <p className={`text-sm sm:text-base text-slate-200 italic leading-relaxed break-keep px-4 py-3.5 bg-slate-900/60 rounded-2xl w-full border shadow-inner transition-colors ${tc.borderMainThin}`}>
+                    <p className={`text-sm sm:text-base text-slate-200 italic leading-relaxed break-keep px-4 py-3.5 bg-slate-900/60 rounded-2xl w-full border shadow-inner transition-colors mb-5 ${tc.borderMainThin}`}>
                         "{card.keyword}"
                     </p>
+
+                    <a 
+                        href={link || "#"}
+                        target={link ? "_blank" : "_self"}
+                        rel="noopener noreferrer"
+                        className={`mt-auto w-full inline-flex justify-center items-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold transition-all shadow-lg hover:scale-[1.02] active:scale-[0.98] bg-gradient-to-r ${tc.btnPrimary} text-white`}
+                        onClick={(e) => {
+                            if (!link) {
+                                e.preventDefault();
+                                showAlert("아직 블로그 링크가 등록되지 않았습니다.\n코드 최상단의 'TAROT_LINKS' 객체에 엑셀 파일의 링크를 추가해주세요.");
+                            }
+                        }}
+                    >
+                        <span>📖</span>
+                        <span>카드 설명 보기</span>
+                    </a>
                 </div>
             );
         };
@@ -503,13 +566,14 @@
             const [fontSize, setFontSize] = useState(() => safeStorage.get("tarotFontSize") || "normal");
             const [themeColor, setThemeColor] = useState(() => safeStorage.get("tarotTheme") || "purple");
 
-            // 현재 선택된 테마의 스타일 구성 객체 가져오기
+            // Custom Dialog State
+            const [dialog, setDialog] = useState({ isOpen: false, type: 'alert', title: '', text: '', onConfirm: null, onCancel: null });
+
             const currentTheme = THEME_CONFIG[themeColor] || THEME_CONFIG.purple;
-            const tc = currentTheme.c; // 단축 변수명 사용
+            const tc = currentTheme.c;
 
             useEffect(() => {
                 const root = document.documentElement;
-                // 선택된 테마의 CSS 변수들을 HTML :root 요소에 동적으로 주입
                 Object.entries(currentTheme.cssVars).forEach(([key, value]) => {
                     root.style.setProperty(key, value);
                 });
@@ -549,8 +613,26 @@
                 }
             }, [history]);
 
+            const showAlert = (text, title = "알림") => {
+                setDialog({
+                    isOpen: true, type: 'alert', title, text,
+                    onConfirm: () => setDialog({ ...dialog, isOpen: false })
+                });
+            };
+
+            const showConfirm = (text, onConfirmCallback, title = "확인") => {
+                setDialog({
+                    isOpen: true, type: 'confirm', title, text,
+                    onConfirm: () => {
+                        onConfirmCallback();
+                        setDialog({ ...dialog, isOpen: false });
+                    },
+                    onCancel: () => setDialog({ ...dialog, isOpen: false })
+                });
+            };
+
             const handleExport = () => {
-                if (history.length === 0) return alert("내보낼 데이터가 없습니다.");
+                if (history.length === 0) return showAlert("내보낼 데이터가 없습니다.");
                 const dataStr = JSON.stringify(history, null, 2);
                 const blob = new Blob([dataStr], { type: "application/json" });
                 const url = URL.createObjectURL(blob);
@@ -578,10 +660,15 @@
                             newHistory.sort((a, b) => b.id - a.id);
                             setHistory(newHistory);
                             safeStorage.set("tarotHistory_kasi_korlunar", JSON.stringify(newHistory));
-                            if (addedCount > 0) alert(`${addedCount}개의 새로운 기록을 성공적으로 불러왔습니다.`);
-                            else alert("모든 기록이 이미 보관함에 존재합니다.");
-                        } else alert("지원되지 않는 파일 형식입니다.");
-                    } catch (error) { alert("파일을 읽는 중 오류가 발생했습니다."); }
+                            
+                            if (addedCount > 0) showAlert(`${addedCount}개의 새로운 기록을 성공적으로 불러왔습니다.`);
+                            else showAlert("모든 기록이 이미 보관함에 존재합니다.");
+                        } else {
+                            showAlert("지원되지 않는 파일 형식입니다.");
+                        }
+                    } catch (error) { 
+                        showAlert("파일을 읽는 중 오류가 발생했습니다."); 
+                    }
                 };
                 reader.readAsText(file);
                 e.target.value = ''; 
@@ -589,12 +676,12 @@
 
             const handleClearAll = () => {
                 if (history.length === 0) return;
-                if (window.confirm("모든 기록을 영구적으로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")) {
+                showConfirm("모든 기록을 영구적으로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.", () => {
                     setHistory([]);
                     safeStorage.set("tarotHistory_kasi_korlunar", "[]");
                     setCurrentResult(null);
-                    alert("모든 기록이 삭제되었습니다.");
-                }
+                    showAlert("모든 기록이 삭제되었습니다.");
+                });
             };
 
             const calculateTarotNumber = (y, m, d) => {
@@ -616,9 +703,9 @@
 
             const handleCalculate = (e) => {
                 e.preventDefault();
-                if (!name.trim()) return alert("이름을 입력해주세요.");
-                if (!birthDate) return alert("생년월일을 선택해주세요.");
-                if (!window.korLunar) return alert("천문연구원 음양력 변환 모듈이 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+                if (!name.trim()) return showAlert("이름을 입력해주세요.");
+                if (!birthDate) return showAlert("생년월일을 선택해주세요.");
+                if (!window.korLunar) return showAlert("천문연구원 음양력 변환 모듈이 로드되지 않았습니다.\n잠시 후 다시 시도해주세요.", "모듈 로딩 중");
 
                 setLoading(true);
 
@@ -661,18 +748,18 @@
                         }, 100);
                     } catch (error) {
                         setLoading(false);
-                        alert("변환 지원 범위를 벗어났거나 유효하지 않은 날짜입니다. (지원 범위: 1890~2050년)");
+                        showAlert("변환 지원 범위를 벗어났거나 유효하지 않은 날짜입니다.\n(지원 범위: 1890~2050년)", "변환 오류");
                     }
                 }, 300);
             };
 
             const handleDelete = (id) => {
-                if(window.confirm("이 기록을 삭제하시겠습니까?")) {
+                showConfirm("이 기록을 삭제하시겠습니까?", () => {
                     const updated = history.filter(item => item.id !== id);
                     setHistory(updated);
                     safeStorage.set("tarotHistory_kasi_korlunar", JSON.stringify(updated));
                     if(currentResult && currentResult.id === id) setCurrentResult(null);
-                }
+                });
             };
 
             return (
@@ -683,6 +770,8 @@
                             오프라인
                         </div>
                     )}
+
+                    <CustomDialog {...dialog} tc={tc} />
 
                     <div className="w-full max-w-6xl flex flex-col gap-6 sm:gap-8 pb-16 mt-6 sm:mt-2 mx-auto">
                         <header className="text-center space-y-4 mt-4">
@@ -717,6 +806,7 @@
                         </div>
 
                         <main className="w-full flex flex-col items-center">
+                            
                             {}
                             {activeTab === 'calc' && (
                                 <div className="w-full max-w-xl animate-fade-in space-y-8">
@@ -774,7 +864,7 @@
                                             <button 
                                                 type="submit"
                                                 disabled={loading}
-                                                className={`w-full bg-gradient-to-r ${tc.btnPrimary} text-white font-bold py-4 px-6 rounded-2xl shadow-xl transform transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4 text-base sm:text-lg tracking-wide disabled:opacity-50`}
+                                                className={`w-full bg-gradient-to-r ${tc.btnPrimary} text-white font-bold py-4 px-6 rounded-2xl shadow-xl transform transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4 text-base sm:text-lg tracking-wide disabled:opacity-50 hover:-translate-y-0.5`}
                                             >
                                                 {loading ? (
                                                     <span className="flex items-center gap-2">
@@ -803,7 +893,7 @@
                                                 </p>
                                             </div>
                                             
-                                            <div className="grid grid-cols-1 gap-6 w-full max-w-md mx-auto">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
                                                 <ResultCard 
                                                     title="선천수 (음력: 내면의 자아)"
                                                     dateLabel="변환된 음력"
@@ -812,6 +902,7 @@
                                                     badgeBg={tc.badgeInnate}
                                                     isOnline={isOnline}
                                                     tc={tc}
+                                                    showAlert={showAlert}
                                                 />
                                                 {currentResult.innateBonusCard != null && (
                                                     <ResultCard 
@@ -822,6 +913,7 @@
                                                         badgeBg={tc.badgeInnateBonus}
                                                         isOnline={isOnline}
                                                         tc={tc}
+                                                        showAlert={showAlert}
                                                     />
                                                 )}
                                                 <ResultCard 
@@ -832,6 +924,7 @@
                                                     badgeBg={tc.badgeAcquired}
                                                     isOnline={isOnline}
                                                     tc={tc}
+                                                    showAlert={showAlert}
                                                 />
                                                 {(currentResult.acquiredBonusCard != null || currentResult.bonusCard != null) && (
                                                     <ResultCard 
@@ -842,6 +935,7 @@
                                                         badgeBg={tc.badgeAcquiredBonus}
                                                         isOnline={isOnline}
                                                         tc={tc}
+                                                        showAlert={showAlert}
                                                     />
                                                 )}
                                             </div>
